@@ -1,0 +1,8 @@
+services:
+  test-runner:
+    image: file-optimizer-dev:latest
+    container_name: test-container
+    network_mode: "host"
+    user: root
+    volumes:
+      - ../tests:/tests

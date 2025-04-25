@@ -1,0 +1,21 @@
+services:
+  optimize-worker:
+    image: file-optimizer:latest
+    container_name: optimize-worker
+    command: /scripts/entrypoint.sh
+    env_file: ../.env
+    restart: always
+    networks:
+      - tvorcha-network
+    volumes:
+      - ../src:/src/
+      - ../scripts:/scripts/
+      - tvorcha-efs:/mnt/efs
+
+networks:
+  tvorcha-network:
+    external: true
+
+volumes:
+  tvorcha-efs:
+    external: true

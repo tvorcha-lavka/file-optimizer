@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "^3.11"
+
+      - name: Install make
+        run: sudo apt-get update && sudo apt-get install -y make
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-root
+
+      - name: Create .env
+        run: cp .env.example .env
+
+      - name: Run isort
+        run: make isort
+
+      - name: Run black
+        run: make black
+
+      - name: Run flake8
+        run: make flake8
+
+      - name: Run mypy
+        run: make mypy
+
+      - name: Build docker image
+        run: make build
+
+      - name: Run tests
+        run: make pytest

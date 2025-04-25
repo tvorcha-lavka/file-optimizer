@@ -1,0 +1,26 @@
+services:
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: rabbitmq
+    env_file: ../.env
+    restart: always
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
+      start_period: 30s
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - tvorcha-network
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+networks:
+  tvorcha-network:
+    external: true
+
+volumes:
+  rabbitmq-data:
