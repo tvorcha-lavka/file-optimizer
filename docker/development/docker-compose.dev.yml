@@ -1,0 +1,7 @@
+services:
+  celery-optimize-worker-1:
+    image: tvorchalavka/file-optimizer:develop
+    restart: no
+    volumes:
+      - ../src:/src:ro
+      - ../scripts:/scripts:ro

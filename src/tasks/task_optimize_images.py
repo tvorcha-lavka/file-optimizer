@@ -1,9 +1,10 @@
 from logging import getLogger
 
-from celery import Task  # type: ignore
+from celery import Task
 
+from core.celery.client import app
+from core.celery.enums import QueueEnum
 from core.exceptions import ImageProcessingError, NoAnyImageFiles, NoOriginalImageFiles
-from main import app
 from processors import ImageOptimizeProcessor
 
 from .schemas import OptimizeProductImages, UploadProductImageData
@@ -11,7 +12,7 @@ from .schemas import OptimizeProductImages, UploadProductImageData
 logger = getLogger("celery.optimize")
 
 
-@app.task(name="optimize.product.images", queue="file-optimizer.queue", bind=True)
+@app.task(name="optimize.product.images", queue=QueueEnum.FILE_OPTIMIZER, bind=True)
 def optimize_product_images_task(self: Task, json_str: str) -> str | None:
     """Optimizes images and sends them to upload process."""
     # Validate the data

@@ -1,38 +1,54 @@
 # --- Variables --------------------------------------------------------------------------------------------------------
-include makefile.utils.mk
+include makefile.mk
 include .env
 
+export ENV_FILE ?= .env
 export ENV_STATE ?= development
-export PROJECT_NAME ?= file-optimizer
-export MAIN_PROJECT_NAME ?= tvorcha-lavka
+
+export DOCKERHUB_USERNAME ?= tvorchalavka
+export PROJECT_NAME ?= tvorcha-lavka-file-optimizer
+export MAIN_PROJECT_NAME ?= tvorcha-lavka-backend
+export BASE_IMAGE_TAG ?= file-optimizer
 
 export DOCKER_NETWORK_NAME ?= tvorcha-network
 export DOCKER_VOLUME_NAME ?= tvorcha-efs
 
 export DOCKER_DIR ?= ./docker
+export DOCKER_DEV_DIR ?= $(DOCKER_DIR)/development
+
 export DOCKER_VOLUME_PATH ?= /mnt/efs
 export DOCKER_FILE_PATH ?= $(DOCKER_DIR)/Dockerfile
 
+DOCKER_COMPOSE_BASE_FLAGS := \
+	--env-file $(ENV_FILE) \
+	-p $(PROJECT_NAME) \
+	-f $(DOCKER_DIR)/docker-compose.yml
+
+DOCKER_COMPOSE_TESTING_FLAGS := \
+	--env-file $(ENV_FILE) \
+	-p $(PROJECT_NAME)-test \
+	-f $(DOCKER_DEV_DIR)/docker-compose.testing.yml
+
+DOCKER_COMPOSE_RABBITMQ_FLAGS := \
+	--env-file $(ENV_FILE) \
+	-p $(MAIN_PROJECT_NAME) \
+	-f $(DOCKER_DIR)/docker-compose.rabbitmq.yml
+
 # Define docker variables
 ifeq ($(ENV_STATE), development)
-  DOCKER_IMAGE_TAG := $(PROJECT_NAME)-dev:latest
-  POETRY_FLAGS := ""
+  POETRY_FLAGS := "--only main,test"
+  DOCKER_IMAGE_TAG := $(DOCKERHUB_USERNAME)/$(BASE_IMAGE_TAG):develop
 
-  DOCKER_COMPOSE_CONFIG := \
-  	--env-file .env \
-	-p $(PROJECT_NAME) \
-    -f $(DOCKER_DIR)/docker-compose.yml \
-    -f $(DOCKER_DIR)/docker-compose.dev.yml
+  DOCKER_COMPOSE_FLAGS := \
+  	$(DOCKER_COMPOSE_BASE_FLAGS) \
+	-f $(DOCKER_DEV_DIR)/docker-compose.dev.yml
 
   DOCKER_VOLUME := $(DOCKER_VOLUME_NAME)
 else
-  DOCKER_IMAGE_TAG := $(PROJECT_NAME):latest
+  DOCKER_IMAGE_TAG := $(DOCKERHUB_USERNAME)/$(BASE_IMAGE_TAG):latest
   POETRY_FLAGS := "--only main"
 
-  DOCKER_COMPOSE_CONFIG := \
-  	--env-file .env \
-	-p $(PROJECT_NAME) \
-    -f $(DOCKER_DIR)/docker-compose.yml
+  DOCKER_COMPOSE_FLAGS := $(DOCKER_COMPOSE_BASE_FLAGS)
 
   DOCKER_VOLUME := $(DOCKER_VOLUME_NAME) \
     --opt device=$(DOCKER_VOLUME_PATH) \
@@ -40,10 +56,6 @@ else
     --opt o=bind \
     --driver local
 endif
-
-# Define additional docker variables
-DOCKER_RABBITMQ_COMPOSE_CONFIG := -f $(DOCKER_DIR)/docker-compose.rabbitmq.yml -p $(MAIN_PROJECT_NAME)
-DOCKER_TESTING_COMPOSE_CONFIG := -f $(DOCKER_DIR)/docker-compose.test.yml -p pytest run --rm test-runner pytest
 
 # Docker health check
 ifeq ($(SHELL_TYPE),Windows)
@@ -63,7 +75,12 @@ else
 endif
 
 # --- Docker -----------------------------------------------------------------------------------------------------------
-.PHONY: build rebuild destroy network volume check-rabbitmq up stop down down-v logs
+.PHONY: generate-compose build rebuild destroy network volume check-rabbitmq up stop down down-v logs
+
+generate-compose:
+	$(call LOG_HEADER,generate compose files)
+	@poetry run python ./scripts/generate_compose.py
+	$(call LOG_HEADER,generation complete!)
 
 rebuild: down destroy build
 
@@ -97,33 +114,33 @@ volume:
 check-rabbitmq:
 	@docker $(call IS_RUNNING,rabbitmq) || ( \
 		echo Starting rabbitmq... && \
-		docker compose $(DOCKER_RABBITMQ_COMPOSE_CONFIG) up -d $(DEV_NULL) && \
+		docker compose $(DOCKER_COMPOSE_RABBITMQ_FLAGS) up -d $(DEV_NULL) && \
 		$(call AWAIT_FOR_SERVICE,rabbitmq) \
 	)
 
 up: network volume check-rabbitmq
 	$(call LOG_HEADER,starting $(PROJECT_NAME) [$(ENV_STATE)])
-	@docker compose $(DOCKER_COMPOSE_CONFIG) up -d
+	@docker compose $(DOCKER_COMPOSE_FLAGS) up -d
 	$(call LOG_HEADER,$(PROJECT_NAME) has been started!)
 
 stop:
 	$(call LOG_HEADER,stopping $(PROJECT_NAME))
-	@docker compose $(DOCKER_COMPOSE_CONFIG) stop
+	@docker compose $(DOCKER_COMPOSE_FLAGS) stop
 	$(call LOG_HEADER,$(PROJECT_NAME) has been stopped!)
 
 down:
 	$(call LOG_HEADER,shutting down $(PROJECT_NAME))
-	@docker compose $(DOCKER_COMPOSE_CONFIG) down $(DEV_NULL)
+	@docker compose $(DOCKER_COMPOSE_FLAGS) down $(DEV_NULL)
 	$(call LOG_HEADER,$(PROJECT_NAME) has been shut down!)
 
 down-v:
 	$(call LOG_HEADER,shutting down $(PROJECT_NAME) and removing volumes)
-	@docker compose $(DOCKER_COMPOSE_CONFIG) down -v $(DEV_NULL)
+	@docker compose $(DOCKER_COMPOSE_FLAGS) down -v $(DEV_NULL)
 	$(call LOG_HEADER,$(PROJECT_NAME) has been shut down!)
 
 logs:
 	$(call LOG_HEADER,$(PROJECT_NAME) logs)
-	@docker compose $(DOCKER_COMPOSE_CONFIG) logs -f
+	@docker compose $(DOCKER_COMPOSE_FLAGS) logs -f
 
 # --- Code Linters -----------------------------------------------------------------------------------------------------
 .PHONY: lint flake8
@@ -160,11 +177,15 @@ mypy:
 
 pytest:
 	$(call LOG_HEADER,pytest)
-	@docker compose $(DOCKER_TESTING_COMPOSE_CONFIG)
+	@docker compose $(DOCKER_COMPOSE_TESTING_FLAGS) run \
+		--rm test-runner python /scripts/run_tests.py --pytest
+	@docker compose $(DOCKER_COMPOSE_TESTING_FLAGS) down -v
 
 pytest-cov:
 	$(call LOG_HEADER,pytest with coverage)
-	@docker compose $(DOCKER_TESTING_COMPOSE_CONFIG) -m "not (xfail or skip)" --cov
+	@docker compose $(DOCKER_COMPOSE_TESTING_FLAGS) run \
+		--rm test-runner python /scripts/run_tests.py --pytest-cov
+	@docker compose $(DOCKER_COMPOSE_TESTING_FLAGS) down -v
 
 # --- Code Checking ----------------------------------------------------------------------------------------------------
 .PHONY: check

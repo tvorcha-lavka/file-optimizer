@@ -2,10 +2,10 @@ import logging.config
 import sys
 from copy import copy
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 import click
-from pydantic.v1 import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ----------------------------------------------------------------------------------------------------------------------
 # --- Code taken from uvicorn.logging.py module ------------------------------------------------------------------------
@@ -49,7 +49,7 @@ class ColorizedFormatter(logging.Formatter):
             return str(level_name)  # pragma: no cover
 
         func = self.level_name_colors.get(level_no, default)
-        return func(level_name)
+        return func(level_name)  # type: ignore
 
     def should_use_colors(self) -> bool:
         return True  # pragma: no cover
@@ -84,28 +84,41 @@ class NoTracebackWarningFilter(logging.Filter):
 
 
 class LoggingSettings(BaseSettings):
-    LOGGING_LEVEL_CONSOLE: int | str = logging.INFO
-    LOGGING_LEVEL_FILE: int | str = logging.WARNING
+    LEVEL_CONSOLE: int | str = logging.INFO
+    LEVEL_FILE: int | str = logging.WARNING
 
-    LOG_PATH: Path = Path("/") / "mnt" / "efs" / "logs" / "file-optimizer"
+    PATH: Path = Path("/") / "mnt" / "efs" / "logs" / "file-optimizer"
 
-    LOG_FILE_MAX_SIZE: int = 10
-    LOG_FILE_BACKUP_COUNT: int = 5
+    FILE_MAX_SIZE: int = 10
+    FILE_BACKUP_COUNT: int = 5
 
-    DEFAULT_HANDLERS = Literal[
+    DEFAULT_HANDLERS: ClassVar = Literal[
         "console",
         "file_optimize_errors",
         "file_worker_errors",
     ]
 
-    DEFAULT_FORMATTER = DefaultFormatter(
+    DEFAULT_FORMATTER: ClassVar = DefaultFormatter(
         fmt="%(levelprefix)s %(message)s",
         use_colors=True,
     )
 
+    model_config = SettingsConfigDict(
+        env_prefix="LOGGING_",
+        case_sensitive=True,
+    )
+
     @staticmethod
-    def to_handlers(handlers: list[DEFAULT_HANDLERS] | None = None, propagate: bool = False, **kwargs: Any) -> dict:
-        return {"handlers": handlers or [], "propagate": propagate, **kwargs}
+    def to_handlers(
+        handlers: list[DEFAULT_HANDLERS] | None = None,
+        propagate: bool = False,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        return {
+            "handlers": handlers or [],
+            "propagate": propagate,
+            **kwargs,
+        }
 
     def set_default_formatter_to_loggers(self) -> None:
         for logger_name in logging.root.manager.loggerDict.keys():
@@ -118,18 +131,18 @@ class LoggingSettings(BaseSettings):
             logger.addHandler(handler)
             logger.propagate = False
 
-    def file_handler(self, file_name: str, level: int | str | None = None) -> dict:
+    def file_handler(self, file_name: str, level: int | str | None = None) -> dict[str, Any]:
         return {
             "formatter": "file",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": self.LOG_PATH / file_name,
-            "backupCount": self.LOG_FILE_BACKUP_COUNT,
-            "maxBytes": self.LOG_FILE_MAX_SIZE * 1024**2,
-            "level": level or self.LOGGING_LEVEL_FILE,
+            "filename": self.PATH / file_name,
+            "backupCount": self.FILE_BACKUP_COUNT,
+            "maxBytes": self.FILE_MAX_SIZE * 1024**2,
+            "level": level or self.LEVEL_FILE,
         }
 
-    def configure(self) -> dict:
-        self.LOG_PATH.mkdir(parents=True, exist_ok=True)
+    def configure(self) -> dict[str, Any]:
+        self.PATH.mkdir(parents=True, exist_ok=True)
         self.set_default_formatter_to_loggers()
         return {
             "version": 1,
@@ -156,7 +169,7 @@ class LoggingSettings(BaseSettings):
                     "formatter": "default",
                     "class": "logging.StreamHandler",
                     "stream": "ext://sys.stdout",
-                    "level": self.LOGGING_LEVEL_CONSOLE,
+                    "level": self.LEVEL_CONSOLE,
                 },
                 "file_optimize_errors": self.file_handler("optimize-errors.log"),
                 "file_worker_errors": self.file_handler("worker-errors.log"),

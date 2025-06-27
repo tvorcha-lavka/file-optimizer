@@ -1,4 +1,0 @@
-services:
-  optimize-worker:
-    image: file-optimizer-dev:latest
-    restart: on-failure

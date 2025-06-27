@@ -1,0 +1,22 @@
+name: Enforce Pull Request Rules
+
+on:
+  pull_request:
+    branches:
+      - main
+      - release
+
+jobs:
+  check-main:
+    if: github.base_ref == 'main'
+    uses: ./.github/workflows/pr-branch-restriction.yml
+    with:
+      target_branch: main
+      allowed_source_branch: develop
+
+  check-release:
+    if: github.base_ref == 'release'
+    uses: ./.github/workflows/pr-branch-restriction.yml
+    with:
+      target_branch: release
+      allowed_source_branch: main

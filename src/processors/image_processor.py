@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import UUID
 
 from PIL import Image, ImageOps, UnidentifiedImageError
-from pillow_heif import register_heif_opener  # type: ignore
+from pillow_heif import register_heif_opener
 
 from core.config.file import image_settings as settings
 from core.exceptions import ImageProcessingError, NoAnyImageFiles, NoOriginalImageFiles
