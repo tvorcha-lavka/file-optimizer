@@ -7,8 +7,8 @@ from uuid import UUID
 import pytest
 from pydantic.v1 import BaseSettings
 
+from core.celery.client import app
 from core.config.file import image_settings
-from main import app
 from processors import ImageOptimizeProcessor
 
 

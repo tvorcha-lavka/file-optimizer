@@ -1,0 +1,40 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+env:
+  IMAGE_NAME: tvorchalavka/file-optimizer
+
+jobs:
+  build-backend-image-and-publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - run: sudo apt-get update && sudo apt-get install -y make
+      - run: cp $GITHUB_WORKSPACE/.env.example $GITHUB_WORKSPACE/.env
+
+      - name: Login to DockerHub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Push dev image (only for develop branch)
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          ENV_STATE=development make build
+          docker push $IMAGE_NAME:develop
+
+      - name: Push prod image (only for main branch)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ENV_STATE=production make build
+          docker tag $IMAGE_NAME:latest $IMAGE_NAME:${{ github.sha }}
+          docker push $IMAGE_NAME:${{ github.sha }}
+          docker push $IMAGE_NAME:latest

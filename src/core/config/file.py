@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic.v1 import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ImageFileSettings(BaseSettings):
@@ -14,6 +14,11 @@ class ImageFileSettings(BaseSettings):
 
     QUALITY_MAP: dict[str, int] = {"JPEG": JPEG_QUALITY, "WEBP": WEBP_QUALITY}
     SUFFIX_MAP: dict[str, str] = {"JPEG": "jpg", "WEBP": "webp"}
+
+    model_config = SettingsConfigDict(
+        env_prefix="IMAGE_",
+        case_sensitive=True,
+    )
 
 
 image_settings = ImageFileSettings()

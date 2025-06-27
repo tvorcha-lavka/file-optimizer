@@ -1,0 +1,12 @@
+services:
+  test-runner:
+    image: tvorchalavka/file-optimizer:develop
+    container_name: test-container
+    env_file: ../../.env
+    network_mode: "host"
+    user: root
+    volumes:
+      - ../../src:/src/
+      - ../../tests:/tests/
+      - ../../scripts:/scripts:ro
+      - ../../pyproject.toml:/tmp/pyproject.toml

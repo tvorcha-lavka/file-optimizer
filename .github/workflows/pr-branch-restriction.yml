@@ -1,0 +1,25 @@
+name: Enforce PR Branch Policy
+
+on:
+  workflow_call:
+    inputs:
+      target_branch:
+        required: true
+        type: string
+      allowed_source_branch:
+        required: true
+        type: string
+
+jobs:
+  validate-pr-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR Source Branch
+        run: |
+          echo "Target branch: ${{ inputs.target_branch }}"
+          echo "Allowed source branch: ${{ inputs.allowed_source_branch }}"
+          echo "Actual source branch: ${{ github.head_ref }}"
+          if [ "${{ github.head_ref }}" != "${{ inputs.allowed_source_branch }}" ]; then
+            echo "::error::Pull requests to '${{ inputs.target_branch }}' must come from '${{ inputs.allowed_source_branch }}'"
+            exit 1
+          fi

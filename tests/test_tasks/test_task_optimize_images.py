@@ -1,8 +1,8 @@
 from contextlib import nullcontext
 
 import pytest
-from celery import states  # type: ignore
-from celery.exceptions import Retry  # type: ignore
+from celery import states
+from celery.exceptions import Retry
 from pytest_mock import MockerFixture
 
 from core.exceptions import ImageProcessingError, NoAnyImageFiles, NoOriginalImageFiles

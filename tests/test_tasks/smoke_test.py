@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
-from main import app
+from core.celery.client import app
 from processors import ImageOptimizeProcessor
 from tasks.schemas import OptimizeProductImages
 from tests.conftest import SettingsForTests

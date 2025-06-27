@@ -1,0 +1,31 @@
+{%- set worker_count = env["CELERY_WORKER_COUNT"] | int -%}
+{%- set default_cpu = env["CELERY_DEFAULT_CPU"] | float -%}
+{%- set default_mem = env["CELERY_DEFAULT_MEM"] -%}
+
+{%- set env_file = "../.env" -%}
+{%- set restart_policy = "always" -%}
+{%- set image_tag = "tvorchalavka/file-optimizer:latest" -%}
+
+services:
+{%- for i in range(1, worker_count + 1) %}
+  celery-optimize-worker-{{ i }}:
+    image: {{ image_tag }}
+    container_name: celery-optimize-worker-{{ i }}
+    command: /scripts/entrypoint.py --worker file-optimizer
+    env_file: {{ env_file }}
+    restart: {{ restart_policy }}
+    networks:
+      - tvorcha-network
+    volumes:
+      - tvorcha-efs:/mnt/efs
+    mem_limit: {{ default_mem }}
+    cpus: {{ default_cpu }}
+{% endfor %}
+
+networks:
+  tvorcha-network:
+    external: true
+
+volumes:
+  tvorcha-efs:
+    external: true
