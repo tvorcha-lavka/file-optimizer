@@ -15,7 +15,7 @@ class OptimizeProductImages(BaseModel):
     product_id: UUID
 
 
-class UploadFilesToS3(BaseModel):
+class UploadProductImageData(BaseModel):
     """
     Data Transfer Object
     for uploading files to S3 task.
