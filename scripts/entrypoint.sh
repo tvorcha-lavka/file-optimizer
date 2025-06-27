@@ -5,7 +5,7 @@ source /scripts/logging.sh
 BASE_FLAGS=(
   "--pool=prefork"
   "--concurrency=2"
-  "--queues=optimize.queue"
+  "--queues=file-optimizer.queue"
   "--max-tasks-per-child=20"
   "--hostname=file-optimizer@%h"
   "--loglevel=info"
