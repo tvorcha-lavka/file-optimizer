@@ -19,7 +19,12 @@ def optimize_product_images_task(self: Task, json_str: str) -> str | None:
     data = OptimizeProductImages.model_validate_json(json_str)
 
     # Initialize the processor
-    processor = ImageOptimizeProcessor(data.user_id, data.session_id, data.product_id)
+    processor = ImageOptimizeProcessor(
+        user_id=data.user_id,
+        session_id=data.session_id,
+        product_id=data.product_id,
+        preset=data.preset,
+    )
 
     try:
         # Execute process
@@ -36,6 +41,7 @@ def optimize_product_images_task(self: Task, json_str: str) -> str | None:
 
     # Preparing data to transfer to the next task
     next_task_data = UploadProductImageData(
+        aws_s3_folder=data.preset.aws_s3_folder,
         processed_files_dir=processor.processed_files_dir,
         product_id=data.product_id,
     )

@@ -41,6 +41,7 @@ class TestOptimizeImagesTask:
             user_id=self.processor._user_id,
             session_id=self.processor._session_id,
             product_id=self.processor._product_id,
+            preset=self.processor._preset,
         )
 
         with pytest.raises(expected_exception) if expected_exception else nullcontext():
@@ -62,6 +63,7 @@ class TestOptimizeImagesTask:
         if isinstance(result.result, str):
             # Preparing data to transfer to the next task
             next_task_data = UploadProductImageData(
+                aws_s3_folder=self.processor._preset.aws_s3_folder,
                 processed_files_dir=self.processor.processed_files_dir,  # noqa
                 product_id=self.processor._product_id,
             )

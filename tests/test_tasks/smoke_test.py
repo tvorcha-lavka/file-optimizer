@@ -22,6 +22,7 @@ class TestOptimizeFlow:
             user_id=test_settings.USER_ID,
             session_id=test_settings.SESSION_ID,
             product_id=test_settings.PRODUCT_ID,
+            preset=test_settings.PRESET,
         )
 
     @pytest.mark.smoke

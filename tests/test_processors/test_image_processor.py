@@ -8,7 +8,6 @@ from pytest_mock import MockerFixture
 
 from core.exceptions import ImageProcessingError, NoAnyImageFiles, NoOriginalImageFiles
 from processors import ImageOptimizeProcessor
-from processors.image_processor import ProductImageDimensions
 from tests.conftest import File
 
 
@@ -113,8 +112,8 @@ class TestImageOptimizeProcessor:
         self.processor._process(original_file.path)
 
         # Check results
-        mock_process.assert_called_once_with(mocked_image, "JPEG")
-        mock_process_with_scaling.assert_called_once_with(mocked_image, "WEBP")
+        mock_process.assert_called_once_with(mocked_image)
+        mock_process_with_scaling.assert_called_once_with(mocked_image)
         unlink_mock.assert_called_once()
 
     @pytest.mark.unit
@@ -131,20 +130,22 @@ class TestImageOptimizeProcessor:
         mocker.patch.object(ImageOps, "exif_transpose", return_value=mocked_transposed)
         save_mock = mocked_transposed.save = mocker.MagicMock()
 
+        i = self.processor._preset.type.original
+
         # Patch processor internals
         self.processor._file_path = original_file.path
-        file_name = "original_" + original_file.path.stem + ".jpg"
+        file_name = i.template.format(hash=self.processor._file_path.stem)
         new_file_path = self.processor.processed_files_dir / file_name  # noqa
 
         # Call `_process_original` method
-        result = self.processor._process_original(mocked_image, "JPEG")
+        result = self.processor._process_original(mocked_image)
 
         # Assert results
         assert result == mocked_transposed
         save_mock.assert_called_once_with(
             fp=new_file_path,
-            format="JPEG",
-            quality=80,
+            format=i.format,
+            quality=i.quality,
             optimize=True,
             exif=b"",
         )
@@ -164,24 +165,24 @@ class TestImageOptimizeProcessor:
         self.processor._file_path = original_file.path
 
         # Call `_process_original_with_scaling` method
-        self.processor._process_original_with_scaling(mocked_image, "WEBP")
+        self.processor._process_original_with_scaling(mocked_image)
 
         # Assert thumbnail + save called per dimension
-        assert mocked_image.copy.call_count == len(ProductImageDimensions)
-        assert copied_image.thumbnail.call_count == len(ProductImageDimensions)
-        assert save_mock.call_count == len(ProductImageDimensions)
+        assert mocked_image.copy.call_count == len(self.processor._preset.type.processed)
+        assert copied_image.thumbnail.call_count == len(self.processor._preset.type.processed)
+        assert save_mock.call_count == len(self.processor._preset.type.processed)
 
-        for size in ProductImageDimensions:
-            width, height = size.value
-            copied_image.thumbnail.assert_any_call((width, height), Image.Resampling.LANCZOS)
+        for i in self.processor._preset.type.processed:
 
-            expected_filename = f"{width}x{height}_{original_file.path.stem}.webp"
+            copied_image.thumbnail.assert_any_call((i.width, i.height), Image.Resampling.LANCZOS)
+
+            expected_filename = i.template.format(hash=self.processor._file_path.stem)
             expected_path = self.processor.processed_files_dir / expected_filename  # noqa
 
             save_mock.assert_any_call(
                 fp=expected_path,
-                format="WEBP",
-                quality=90,
+                format=i.format,
+                quality=i.quality,
                 optimize=True,
                 exif=b"",
             )
