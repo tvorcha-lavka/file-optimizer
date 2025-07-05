@@ -1,4 +1,3 @@
-from enum import Enum
 from logging import getLogger
 from pathlib import Path
 from uuid import UUID
@@ -9,17 +8,10 @@ from pillow_heif import register_heif_opener
 from core.config.file import image_settings as settings
 from core.exceptions import ImageProcessingError, NoAnyImageFiles, NoOriginalImageFiles
 from core.utils import log_param
+from tasks.schemas import ImagePreset
 
 logger = getLogger("celery.optimize")
 register_heif_opener()
-
-
-class ProductImageDimensions(Enum):
-    """Enumeration for different product image dimensions."""
-
-    SMALL = (150, 200)
-    MEDIUM = (450, 600)
-    LARGE = (675, 900)
 
 
 class ImageOptimizeProcessor:
@@ -27,6 +19,7 @@ class ImageOptimizeProcessor:
 
     __slots__ = (
         "_file_path",
+        "_preset",
         "_product_id",
         "_user_id",
         "_session_id",
@@ -36,8 +29,9 @@ class ImageOptimizeProcessor:
         "processed_files_dir",
     )
 
-    def __init__(self, user_id: UUID, session_id: UUID, product_id: UUID) -> None:
+    def __init__(self, user_id: UUID, session_id: UUID, product_id: UUID, preset: ImagePreset) -> None:
         self._file_path = Path()
+        self._preset = preset
 
         self._product_id = product_id
         self._user_id = user_id
@@ -93,19 +87,16 @@ class ImageOptimizeProcessor:
         self._file_path = file_path
 
         with Image.open(self._file_path) as img_file:
-            logger.debug("Optimizing original image %s", self._file_path.name)
-            img_file = self._process_original(img_file, settings.ORIGINAL_FILE_FORMAT)
-
-            logger.debug("Optimizing original image %s with scaling.", self._file_path.name)
-            self._process_original_with_scaling(img_file, settings.PROCESSED_FILE_FORMAT)
+            img_file = self._process_original(img_file)
+            self._process_original_with_scaling(img_file)
 
         # Delete the original file
         self._file_path.unlink(missing_ok=True)
 
-    def _process_original(self, img_file: Image.Image, file_format: str) -> Image.Image:
+    def _process_original(self, img_file: Image.Image) -> Image.Image:
         """Processes and saves the original image with optimizations."""
-        suffix = settings.SUFFIX_MAP[settings.ORIGINAL_FILE_FORMAT]
-        quality = settings.QUALITY_MAP[settings.ORIGINAL_FILE_FORMAT]
+        logger.debug("Optimizing original image %s", self._file_path.name)
+        i = self._preset.type.original
 
         # Apply EXIF orientation
         img = ImageOps.exif_transpose(img_file)
@@ -115,31 +106,29 @@ class ImageOptimizeProcessor:
             img = img.convert("RGB")
 
         # Create a new file name
-        file_name = f"original_{self._file_path.stem}.{suffix}"
+        file_name = i.template.format(hash=self._file_path.stem)
         new_file_path = self.processed_files_dir / file_name
 
         # Save the image to a new file
         logger.debug("Saving optimized original image %s", file_name)
-        img.save(fp=new_file_path, format=file_format, quality=quality, optimize=True, exif=b"")
+        img.save(fp=new_file_path, format=i.format, quality=i.quality, optimize=True, exif=b"")
 
         return img
 
-    def _process_original_with_scaling(self, img_file: Image.Image, file_format: str) -> None:
+    def _process_original_with_scaling(self, img_file: Image.Image) -> None:
         """Processes and saves the processed image in different sizes."""
-        suffix = settings.SUFFIX_MAP[file_format]
-        quality = settings.QUALITY_MAP[file_format]
+        logger.debug("Optimizing original image %s with scaling.", self._file_path.name)
 
-        for size in ProductImageDimensions:
+        for i in self._preset.type.processed:
             img = img_file.copy()
-            width, height = size.value
 
             # Resize the image while preserving the proportions
-            img.thumbnail((width, height), Image.Resampling.LANCZOS)
+            img.thumbnail((i.width, i.height), Image.Resampling.LANCZOS)
 
             # Create a new file name
-            file_name = f"{width}x{height}_{self._file_path.stem}.{suffix}"
+            file_name = i.template.format(hash=self._file_path.stem)
             new_file_path = self.processed_files_dir / file_name
 
             # Save the image to a new file
             logger.debug("Saving processed image %s", file_name)
-            img.save(fp=new_file_path, format=file_format, quality=quality, optimize=True, exif=b"")
+            img.save(fp=new_file_path, format=i.format, quality=i.quality, optimize=True, exif=b"")

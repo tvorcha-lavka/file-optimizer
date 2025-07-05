@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from shutil import rmtree
 from typing import Any, Generator
 from uuid import UUID
@@ -10,6 +10,7 @@ from pydantic.v1 import BaseSettings
 from core.celery.client import app
 from core.config.file import image_settings
 from processors import ImageOptimizeProcessor
+from tasks.schemas import ImageConfig, ImagePreset, PresetType
 
 
 @dataclass
@@ -34,6 +35,29 @@ class SettingsForTests(BaseSettings):
     BASE_DIR: Path = Path("/") / "tmp" / "test-dir"
     ORIGINAL_FILES_DIR: Path = BASE_DIR / str(USER_ID) / str(SESSION_ID) / "original"
     PROCESSED_FILES_DIR: Path = BASE_DIR / str(USER_ID) / str(SESSION_ID) / "processed"
+
+    O_IMAGE_CONFIG: ImageConfig = ImageConfig(
+        format="JPEG",
+        height=0,
+        width=0,
+        quality=80,
+        template="original_{hash}.jpg",
+    )
+    P_IMAGE_CONFIG: ImageConfig = ImageConfig(
+        format="WEBP",
+        height=100,
+        width=100,
+        quality=90,
+        template="100x100_{hash}.webp",
+    )
+
+    PRESET: ImagePreset = ImagePreset(
+        aws_s3_folder=PurePosixPath("test"),
+        type=PresetType(
+            original=O_IMAGE_CONFIG,
+            processed=[P_IMAGE_CONFIG],
+        ),
+    )
 
 
 @pytest.fixture(scope="session")
@@ -112,4 +136,5 @@ def image_optimize_processor(test_settings: SettingsForTests) -> ImageOptimizePr
         user_id=test_settings.USER_ID,
         session_id=test_settings.SESSION_ID,
         product_id=test_settings.PRODUCT_ID,
+        preset=test_settings.PRESET,
     )
